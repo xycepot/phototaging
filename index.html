@@ -28,11 +28,17 @@
             -webkit-text-fill-color:transparent; background-clip:text; margin-bottom:6px;
         }
         .subhead { text-align:center; color:#7f98aa; font-size:.75rem; text-transform:uppercase; letter-spacing:3px; margin-bottom:20px; }
+
         .camera-wrap {
             position:relative; border-radius:32px; overflow:hidden; background:#10171e;
             aspect-ratio:1/1; margin-bottom:20px; box-shadow:0 0 0 2px #1f2e38, 0 15px 25px -8px black;
         }
-        #video { width:100%; height:100%; object-fit:cover; display:block; transform:scaleX(-1); }
+        #video { width:100%; height:100%; object-fit:cover; display:block; }
+        /* Kamera belakang: mirror agar terasa natural saat preview */
+        #video.back { transform: scaleX(-1); }
+        /* Kamera depan: tidak mirror (sesuai preview selfie umum) */
+        #video.front { transform: none; }
+
         .camera-placeholder {
             position:absolute; inset:0; display:flex; flex-direction:column; justify-content:center;
             align-items:center; color:#3f5563; font-size:.9rem; gap:8px; pointer-events:none;
@@ -40,6 +46,29 @@
         }
         .camera-placeholder span { font-size:2.5rem; filter:drop-shadow(0 4px 6px black); }
         .camera-wrap.active .camera-placeholder { display:none; }
+
+        /* Tombol switch kamera mengambang di atas preview */
+        .switch-camera-btn {
+            position: absolute; top: 14px; right: 14px; z-index: 5;
+            width: 46px; height: 46px; border-radius: 50%;
+            background: rgba(8, 14, 20, 0.55);
+            border: 1px solid rgba(255,255,255,0.18);
+            color: #fff; font-size: 1.3rem; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            transition: transform .2s, background .2s;
+        }
+        .switch-camera-btn:active { transform: scale(0.9); background: rgba(8,14,20,0.85); }
+        .switch-camera-btn:disabled { opacity: 0.35; pointer-events: none; }
+        .switch-camera-btn .cam-label {
+            position: absolute; bottom: -22px; right: 0;
+            font-size: 0.55rem; font-weight: 700; letter-spacing: 1px;
+            color: #c0e0ff; text-shadow: 0 1px 2px black;
+            background: rgba(8,14,20,0.55); padding: 2px 6px; border-radius: 6px;
+            white-space: nowrap;
+        }
+
         .action-bar { display:flex; gap:12px; margin-bottom:22px; }
         .btn {
             border:none; border-radius:60px; padding:16px 8px; font-weight:600; font-size:.95rem;
@@ -54,6 +83,7 @@
         .btn-share { background:#1e5e3c; color:#fff; box-shadow:0 6px 0 #0e3a24; border-color:#2e7a52; }
         .btn-share:active { box-shadow:0 2px 0 #0e3a24; }
         .btn:disabled { opacity:.4; pointer-events:none; transform:none !important; }
+
         .tag-card {
             background:#0d171f; border-radius:26px; padding:16px; border:1px solid #20313d;
             box-shadow:inset 0 1px 0 rgba(255,255,255,.03), 0 12px 18px -8px black; margin-bottom:16px;
@@ -68,6 +98,7 @@
         .tag-text strong { color:#e3f0fa; font-weight:600; }
         .tag-sub { color:#6b8b9c; font-size:.7rem; letter-spacing:.2px; display:block; margin-top:2px; }
         #waktuDisplay { font-variant-numeric: tabular-nums; font-weight:500; color:#c8e2f5; }
+
         .preview-box {
             border-radius:20px; overflow:hidden; background:#0a1218; border:1px solid #2b4150; margin-bottom:12px;
         }
@@ -140,11 +171,16 @@
         <div class="subhead">phototaging</div>
 
         <div class="camera-wrap" id="cameraWrap">
-            <video id="video" autoplay playsinline muted></video>
+            <video id="video" autoplay playsinline muted class="back"></video>
             <div class="camera-placeholder" id="cameraPlaceholder">
                 <span>📸</span>
                 <div>Kamera belum aktif</div>
             </div>
+            <!-- Tombol switch kamera -->
+            <button class="switch-camera-btn" id="switchCameraBtn" title="Putar kamera" disabled>
+                🔄
+                <span class="cam-label" id="camLabel">BELAKANG</span>
+            </button>
         </div>
 
         <div class="action-bar">
@@ -212,6 +248,8 @@
         const cameraPlaceholder = document.getElementById('cameraPlaceholder');
         const startCameraBtn = document.getElementById('startCameraBtn');
         const takePhotoBtn = document.getElementById('takePhotoBtn');
+        const switchCameraBtn = document.getElementById('switchCameraBtn');
+        const camLabel = document.getElementById('camLabel');
         const shareWhatsappBtn = document.getElementById('shareWhatsappBtn');
         const photoPreview = document.getElementById('photoPreview');
         const emptyPreview = document.getElementById('emptyPreview');
@@ -228,6 +266,14 @@
         // ---------- STATE ----------
         let stream = null;
         let lastPhotoDataUrl = null;
+
+        // facingMode saat ini: 'environment' (belakang) atau 'user' (depan)
+        let currentFacing = 'environment';
+
+        // Cek dukungan kamera ganda
+        let availableCameras = [];
+        let currentCameraIndex = null;
+
         const geo = {
             lat: null, lon: null,
             latDD: '—', lonDD: '—',
@@ -319,29 +365,94 @@
         }
 
         // ---------- KAMERA ----------
-        async function startCamera() {
-            if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
-            try {
-                stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 1280 } },
-                    audio: false
-                });
-                video.srcObject = stream;
-                await video.play();
-                cameraWrap.classList.add('active');
-                cameraPlaceholder.style.display = 'none';
-                takePhotoBtn.disabled = false;
-                startCameraBtn.textContent = '🔄 Nyalakan Ulang';
-            } catch (err) {
-                console.error(err);
-                alert('Tidak dapat mengakses kamera. Pastikan izin dan pakai HTTPS.');
-                takePhotoBtn.disabled = true;
+        // Update tampilan video (mirror / tidak) & label tombol switch
+        function updateCameraUI() {
+            if (currentFacing === 'environment') {
+                video.classList.add('back');
+                video.classList.remove('front');
+                camLabel.textContent = 'BELAKANG';
+            } else {
+                video.classList.add('front');
+                video.classList.remove('back');
+                camLabel.textContent = 'DEPAN';
             }
         }
 
+        async function startCamera(facing = currentFacing) {
+            // Hentikan stream lama
+            if (stream) {
+                stream.getTracks().forEach(t => t.stop());
+                stream = null;
+            }
+
+            try {
+                // Coba pakai deviceId jika tersedia dan kita tahu jumlah kamera
+                const constraints = {
+                    video: {
+                        facingMode: { ideal: facing },
+                        width: { ideal: 1280 },
+                        height: { ideal: 1280 }
+                    },
+                    audio: false
+                };
+
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = stream;
+                await video.play();
+
+                currentFacing = facing;
+                updateCameraUI();
+
+                cameraWrap.classList.add('active');
+                cameraPlaceholder.style.display = 'none';
+                takePhotoBtn.disabled = false;
+                switchCameraBtn.disabled = false;
+                startCameraBtn.textContent = '🔄 Nyalakan Ulang';
+
+                // Deteksi jumlah kamera untuk validasi
+                try {
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    availableCameras = devices.filter(d => d.kind === 'videoinput');
+                    // Kalau cuma 1 kamera, tombol switch tetap aktif tapi beri info
+                    if (availableCameras.length <= 1) {
+                        switchCameraBtn.disabled = true;
+                        camLabel.textContent = '1 KAMERA';
+                    }
+                } catch (e) { /* ignore */ }
+
+            } catch (err) {
+                console.error('Gagal akses kamera:', err);
+                // Fallback: coba tanpa facingMode (kadang driver aneh)
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                    video.srcObject = stream;
+                    await video.play();
+                    cameraWrap.classList.add('active');
+                    cameraPlaceholder.style.display = 'none';
+                    takePhotoBtn.disabled = false;
+                    switchCameraBtn.disabled = false;
+                    statusLine.textContent = 'Kamera aktif (mode default)';
+                } catch (err2) {
+                    alert('Tidak dapat mengakses kamera. Pastikan izin dan pakai HTTPS.');
+                    takePhotoBtn.disabled = true;
+                    switchCameraBtn.disabled = true;
+                }
+            }
+        }
+
+        // ---------- SWITCH KAMERA ----------
+        async function switchCamera() {
+            if (!stream) {
+                alert('Nyalakan kamera terlebih dahulu.');
+                return;
+            }
+            const next = currentFacing === 'environment' ? 'user' : 'environment';
+            statusLine.textContent = `Beralih ke kamera ${next === 'user' ? 'depan' : 'belakang'}…`;
+            await startCamera(next);
+            statusLine.textContent = `Kamera ${currentFacing === 'user' ? 'depan' : 'belakang'} aktif ✓`;
+        }
+
         // ---------- BURN TAG ke POJOK KIRI BAWAH (overlay) ----------
-        // Foto TIDAK ditambah tinggi. Teks digambar menimpa bagian bawah foto,
-        // dengan background semi-transparan agar terbaca.
         function drawTagOnCanvas(ctx, canvasW, canvasH) {
             const pad = Math.round(canvasW * 0.028);
             const fontSize = Math.round(canvasW * 0.028);
@@ -355,7 +466,6 @@
                 `📅 Waktu: ${t.dateLocal} | ${t.timeLocal}`
             ];
 
-            // Wrap teks sesuai lebar yang tersedia (sisakan margin)
             const wrapMaxWidth = canvasW - pad * 2;
             const wrapped = [];
             ctx.font = `${fontSize}px system-ui, -apple-system, sans-serif`;
@@ -374,17 +484,13 @@
                 if (cur) wrapped.push(cur);
             });
 
-            // Ukuran blok teks
             const blockPad = Math.round(pad * 0.9);
             const blockWidth = canvasW - pad * 2;
             const blockHeight = wrapped.length * lineHeight + blockPad * 2;
-
-            // Posisi: pojok kiri bawah, dengan margin
             const margin = pad;
             const blockX = margin;
             const blockY = canvasH - blockHeight - margin;
 
-            // Background semi-transparan (rounded rect)
             const radius = Math.round(fontSize * 0.6);
             ctx.save();
             ctx.shadowColor = 'rgba(0,0,0,0.6)';
@@ -395,7 +501,6 @@
             ctx.fill();
             ctx.restore();
 
-            // Border tipis
             ctx.save();
             roundRect(ctx, blockX, blockY, blockWidth, blockHeight, radius);
             ctx.strokeStyle = 'rgba(255,255,255,0.12)';
@@ -403,7 +508,6 @@
             ctx.stroke();
             ctx.restore();
 
-            // Teks
             ctx.fillStyle = '#ffffff';
             ctx.textBaseline = 'top';
             ctx.shadowColor = 'rgba(0,0,0,0.85)';
@@ -424,7 +528,6 @@
             ctx.shadowOffsetY = 0;
         }
 
-        // Helper rounded rectangle
         function roundRect(ctx, x, y, w, h, r) {
             ctx.beginPath();
             ctx.moveTo(x + r, y);
@@ -445,20 +548,23 @@
             const w = video.videoWidth;
             const h = video.videoHeight;
 
-            // Kanvas SAMA dengan ukuran video — TIDAK ditambah tinggi
             const canvas = document.createElement('canvas');
             canvas.width = w;
             canvas.height = h;
             const ctx = canvas.getContext('2d');
 
-            // Gambar foto (mirror)
-            ctx.save();
-            ctx.translate(w, 0);
-            ctx.scale(-1, 1);
-            ctx.drawImage(video, 0, 0, w, h);
-            ctx.restore();
+            // Mirror hanya untuk kamera belakang (agar hasil akhir sesuai preview)
+            // Kamera depan: tidak mirror (selfie natural)
+            if (currentFacing === 'environment') {
+                ctx.save();
+                ctx.translate(w, 0);
+                ctx.scale(-1, 1);
+                ctx.drawImage(video, 0, 0, w, h);
+                ctx.restore();
+            } else {
+                ctx.drawImage(video, 0, 0, w, h);
+            }
 
-            // Tag menempel di pojok kiri bawah (overlay)
             drawTagOnCanvas(ctx, w, h);
 
             const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
@@ -468,7 +574,7 @@
             photoPreview.style.display = 'block';
             emptyPreview.style.display = 'none';
             shareWhatsappBtn.disabled = false;
-            statusLine.textContent = 'Foto siap dibagikan ✓';
+            statusLine.textContent = `Foto siap dibagikan ✓ (kamera ${currentFacing === 'user' ? 'depan' : 'belakang'})`;
         }
 
         // ---------- SHARE ----------
@@ -502,8 +608,9 @@
         }
 
         // ---------- EVENT ----------
-        startCameraBtn.addEventListener('click', startCamera);
+        startCameraBtn.addEventListener('click', () => startCamera(currentFacing));
         takePhotoBtn.addEventListener('click', takePhoto);
+        switchCameraBtn.addEventListener('click', switchCamera);
         shareWhatsappBtn.addEventListener('click', shareToWhatsapp);
         window.addEventListener('beforeunload', () => { if (stream) stream.getTracks().forEach(t => t.stop()); });
 
@@ -521,50 +628,4 @@
                             fetch(e.request).then(res => {
                                 const copy = res.clone();
                                 caches.open(CACHE).then(c => c.put(e.request, copy)).catch(()=>{});
-                                return res;
-                            }).catch(() => caches.match(e.request).then(r => r || new Response('Offline', {status:503})))
-                        );
-                    });
-                `;
-                const blob = new Blob([swCode], { type: 'text/javascript' });
-                const swUrl = URL.createObjectURL(blob);
-                await navigator.serviceWorker.register(swUrl);
-                console.log('[PWA] Service Worker terdaftar (inline Blob).');
-            } catch (err) { console.warn('[PWA] Gagal registrasi SW:', err); }
-        }
-        registerSW();
-
-        let deferredPrompt = null;
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            deferredPrompt = e;
-            if (!window.matchMedia('(display-mode: standalone)').matches) {
-                installBanner.classList.add('show');
-            }
-        });
-        installBtn.addEventListener('click', async () => {
-            if (!deferredPrompt) return;
-            deferredPrompt.prompt();
-            const { outcome } = await deferredPrompt.userChoice;
-            console.log('[PWA] Pilihan instalasi:', outcome);
-            deferredPrompt = null;
-            installBanner.classList.remove('show');
-        });
-        installClose.addEventListener('click', () => installBanner.classList.remove('show'));
-        window.addEventListener('appinstalled', () => {
-            console.log('[PWA] XYCHEPOTO berhasil diinstal.');
-            installBanner.classList.remove('show');
-            deferredPrompt = null;
-        });
-        if (window.matchMedia('(display-mode: standalone)').matches) {
-            installBanner.style.display = 'none';
-        }
-
-        // ---------- INIT ----------
-        takePhotoBtn.disabled = true;
-        shareWhatsappBtn.disabled = true;
-        fetchLocation();
-    })();
-    </script>
-</body>
-</html>
+                               
