@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>XYCHEPOTO · phototaging</title>
 
-    <!-- ============ PWA META ============ -->
     <meta name="theme-color" content="#151e26">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -84,7 +83,6 @@
         }
         .footer-note { text-align:center; color:#314753; font-size:.6rem; margin-top:10px; letter-spacing:1px; }
 
-        /* ============ PWA INSTALL BANNER ============ */
         .install-banner {
             position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%) translateY(200%);
             background: linear-gradient(135deg,#1c4e6e,#1e5e3c); color:#fff;
@@ -105,9 +103,7 @@
         }
     </style>
 
-    <!-- ============ MANIFEST (inline via Blob) ============ -->
     <script>
-        // Manifest disuntikkan saat runtime via Blob URL — membuat PWA bisa diinstal tanpa file .webmanifest terpisah.
         (function generateManifest() {
             const iconSvg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'>
                 <rect width='512' height='512' rx='110' fill='#151e26'/>
@@ -116,21 +112,13 @@
                 <rect x='96' y='176' width='80' height='56' rx='14' fill='#7aa9d9'/>
                 <text x='256' y='430' text-anchor='middle' font-family='system-ui,sans-serif' font-size='64' font-weight='800' fill='#c0e0ff' letter-spacing='4'>XY</text>
             </svg>`;
-
-            // Data URI SVG → base64 untuk manifest icons
             const svgDataUri = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(iconSvg)));
-
             const manifest = {
                 name: "XYCHEPOTO · Phototaging",
                 short_name: "XYCHEPOTO",
                 description: "Aplikasi phototaging — ambil foto & tempel info lokasi otomatis.",
-                start_url: ".",
-                scope: ".",
-                display: "standalone",
-                orientation: "portrait",
-                background_color: "#0b0f14",
-                theme_color: "#151e26",
-                lang: "id",
+                start_url: ".", scope: ".", display: "standalone", orientation: "portrait",
+                background_color: "#0b0f14", theme_color: "#151e26", lang: "id",
                 icons: [
                     { src: svgDataUri, sizes: "any", type: "image/svg+xml", purpose: "any" },
                     { src: svgDataUri, sizes: "192x192", type: "image/svg+xml", purpose: "any" },
@@ -138,12 +126,10 @@
                     { src: svgDataUri, sizes: "any", type: "image/svg+xml", purpose: "maskable" }
                 ]
             };
-
             const blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
             const url = URL.createObjectURL(blob);
             const link = document.createElement('link');
-            link.rel = 'manifest';
-            link.href = url;
+            link.rel = 'manifest'; link.href = url;
             document.head.appendChild(link);
         })();
     </script>
@@ -208,7 +194,6 @@
         <div class="footer-note">XYCHEPOTO · tagging otomatis</div>
     </div>
 
-    <!-- ============ PWA INSTALL BANNER ============ -->
     <div class="install-banner" id="installBanner">
         <div class="ib-icon">📷</div>
         <div class="ib-text">
@@ -236,8 +221,6 @@
         const addressTxt = document.getElementById('addressTxt');
         const gpsTxt = document.getElementById('gpsTxt');
         const statusLine = document.getElementById('statusLine');
-
-        // PWA DOM
         const installBanner = document.getElementById('installBanner');
         const installBtn = document.getElementById('installBtn');
         const installClose = document.getElementById('installClose');
@@ -245,7 +228,6 @@
         // ---------- STATE ----------
         let stream = null;
         let lastPhotoDataUrl = null;
-
         const geo = {
             lat: null, lon: null,
             latDD: '—', lonDD: '—',
@@ -357,11 +339,14 @@
             }
         }
 
-        // ---------- BURN TAG ----------
-        function drawTagOnCanvas(ctx, canvasW, canvasH, photoH) {
-            const pad = Math.round(canvasW * 0.04);
-            const fontSize = Math.round(canvasW * 0.030);
-            const lineHeight = Math.round(fontSize * 1.45);
+        // ---------- BURN TAG ke POJOK KIRI BAWAH (overlay) ----------
+        // Foto TIDAK ditambah tinggi. Teks digambar menimpa bagian bawah foto,
+        // dengan background semi-transparan agar terbaca.
+        function drawTagOnCanvas(ctx, canvasW, canvasH) {
+            const pad = Math.round(canvasW * 0.028);
+            const fontSize = Math.round(canvasW * 0.028);
+            const lineHeight = Math.round(fontSize * 1.40);
+
             const t = nowParts();
             const lines = [
                 `📍 ${geo.locationName}`,
@@ -369,62 +354,116 @@
                 `🌐 GPS: Lat ${geo.latDD}, Long ${geo.lonDD}`,
                 `📅 Waktu: ${t.dateLocal} | ${t.timeLocal}`
             ];
+
+            // Wrap teks sesuai lebar yang tersedia (sisakan margin)
+            const wrapMaxWidth = canvasW - pad * 2;
             const wrapped = [];
             ctx.font = `${fontSize}px system-ui, -apple-system, sans-serif`;
-            const maxWidth = canvasW - pad * 2;
             lines.forEach(line => {
                 const words = line.split(' ');
                 let cur = '';
                 words.forEach(w => {
                     const test = cur ? cur + ' ' + w : w;
-                    if (ctx.measureText(test).width > maxWidth && cur) { wrapped.push(cur); cur = w; }
-                    else { cur = test; }
+                    if (ctx.measureText(test).width > wrapMaxWidth && cur) {
+                        wrapped.push(cur);
+                        cur = w;
+                    } else {
+                        cur = test;
+                    }
                 });
                 if (cur) wrapped.push(cur);
             });
-            const boxY = photoH;
-            const grad = ctx.createLinearGradient(0, boxY, 0, canvasH);
-            grad.addColorStop(0, '#0d171f');
-            grad.addColorStop(1, '#050a0e');
-            ctx.fillStyle = grad;
-            ctx.fillRect(0, boxY, canvasW, canvasH - boxY);
+
+            // Ukuran blok teks
+            const blockPad = Math.round(pad * 0.9);
+            const blockWidth = canvasW - pad * 2;
+            const blockHeight = wrapped.length * lineHeight + blockPad * 2;
+
+            // Posisi: pojok kiri bawah, dengan margin
+            const margin = pad;
+            const blockX = margin;
+            const blockY = canvasH - blockHeight - margin;
+
+            // Background semi-transparan (rounded rect)
+            const radius = Math.round(fontSize * 0.6);
+            ctx.save();
+            ctx.shadowColor = 'rgba(0,0,0,0.6)';
+            ctx.shadowBlur = 8;
+            ctx.shadowOffsetY = 3;
+            roundRect(ctx, blockX, blockY, blockWidth, blockHeight, radius);
+            ctx.fillStyle = 'rgba(8, 14, 20, 0.62)';
+            ctx.fill();
+            ctx.restore();
+
+            // Border tipis
+            ctx.save();
+            roundRect(ctx, blockX, blockY, blockWidth, blockHeight, radius);
+            ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+            ctx.lineWidth = Math.max(1, Math.round(canvasW * 0.0015));
+            ctx.stroke();
+            ctx.restore();
+
+            // Teks
             ctx.fillStyle = '#ffffff';
             ctx.textBaseline = 'top';
-            ctx.shadowColor = 'rgba(0,0,0,0.9)';
+            ctx.shadowColor = 'rgba(0,0,0,0.85)';
             ctx.shadowBlur = 3;
             ctx.shadowOffsetX = 1;
             ctx.shadowOffsetY = 1;
-            let y = boxY + pad;
-            wrapped.forEach(line => { ctx.fillText(line, pad, y); y += lineHeight; });
+
+            let y = blockY + blockPad;
+            const textX = blockX + blockPad;
+            wrapped.forEach(line => {
+                ctx.fillText(line, textX, y);
+                y += lineHeight;
+            });
+
             ctx.shadowColor = 'transparent';
             ctx.shadowBlur = 0;
             ctx.shadowOffsetX = 0;
             ctx.shadowOffsetY = 0;
         }
 
+        // Helper rounded rectangle
+        function roundRect(ctx, x, y, w, h, r) {
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+            ctx.lineTo(x + w, y + h - r);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+            ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+        }
+
         // ---------- TAKE PHOTO ----------
         function takePhoto() {
             if (!stream || !video.videoWidth) { alert('Kamera belum siap.'); return; }
-            const w = video.videoWidth, h = video.videoHeight;
-            const fontSize = Math.round(w * 0.030);
-            const lineHeight = Math.round(fontSize * 1.45);
-            const pad = Math.round(w * 0.04);
-            const estimatedLines = 8;
-            const tagArea = pad * 2 + estimatedLines * lineHeight;
-            const canvasW = w, canvasH = h + tagArea;
+            const w = video.videoWidth;
+            const h = video.videoHeight;
+
+            // Kanvas SAMA dengan ukuran video — TIDAK ditambah tinggi
             const canvas = document.createElement('canvas');
-            canvas.width = canvasW; canvas.height = canvasH;
+            canvas.width = w;
+            canvas.height = h;
             const ctx = canvas.getContext('2d');
+
+            // Gambar foto (mirror)
             ctx.save();
             ctx.translate(w, 0);
             ctx.scale(-1, 1);
             ctx.drawImage(video, 0, 0, w, h);
             ctx.restore();
-            ctx.fillStyle = '#050a0e';
-            ctx.fillRect(0, h, canvasW, canvasH - h);
-            drawTagOnCanvas(ctx, canvasW, canvasH, h);
+
+            // Tag menempel di pojok kiri bawah (overlay)
+            drawTagOnCanvas(ctx, w, h);
+
             const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
             lastPhotoDataUrl = dataUrl;
+
             photoPreview.src = dataUrl;
             photoPreview.style.display = 'block';
             emptyPreview.style.display = 'none';
@@ -468,22 +507,15 @@
         shareWhatsappBtn.addEventListener('click', shareToWhatsapp);
         window.addEventListener('beforeunload', () => { if (stream) stream.getTracks().forEach(t => t.stop()); });
 
-        // ---------- PWA: Service Worker (inline Blob) ----------
-        // SW diperlukan agar PWA memenuhi syarat "installable" di Chrome/Android.
-        // Kita daftarkan SW minimal yang meng-cache app shell (offline-first).
+        // ---------- PWA ----------
         async function registerSW() {
             if (!('serviceWorker' in navigator)) return;
             try {
                 const swCode = `
                     const CACHE = 'xychepoto-v1';
-                    self.addEventListener('install', e => {
-                        self.skipWaiting();
-                    });
-                    self.addEventListener('activate', e => {
-                        e.waitUntil(clients.claim());
-                    });
+                    self.addEventListener('install', e => { self.skipWaiting(); });
+                    self.addEventListener('activate', e => { e.waitUntil(clients.claim()); });
                     self.addEventListener('fetch', e => {
-                        // Network-first untuk HTML & API; fallback cache untuk asset.
                         if (e.request.method !== 'GET') return;
                         e.respondWith(
                             fetch(e.request).then(res => {
@@ -498,24 +530,18 @@
                 const swUrl = URL.createObjectURL(blob);
                 await navigator.serviceWorker.register(swUrl);
                 console.log('[PWA] Service Worker terdaftar (inline Blob).');
-            } catch (err) {
-                console.warn('[PWA] Gagal registrasi SW:', err);
-            }
+            } catch (err) { console.warn('[PWA] Gagal registrasi SW:', err); }
         }
         registerSW();
 
-        // ---------- PWA: Install Prompt ----------
         let deferredPrompt = null;
-
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredPrompt = e;
-            // Tampilkan banner jika belum diinstal
             if (!window.matchMedia('(display-mode: standalone)').matches) {
                 installBanner.classList.add('show');
             }
         });
-
         installBtn.addEventListener('click', async () => {
             if (!deferredPrompt) return;
             deferredPrompt.prompt();
@@ -524,18 +550,12 @@
             deferredPrompt = null;
             installBanner.classList.remove('show');
         });
-
-        installClose.addEventListener('click', () => {
-            installBanner.classList.remove('show');
-        });
-
+        installClose.addEventListener('click', () => installBanner.classList.remove('show'));
         window.addEventListener('appinstalled', () => {
             console.log('[PWA] XYCHEPOTO berhasil diinstal.');
             installBanner.classList.remove('show');
             deferredPrompt = null;
         });
-
-        // Jika dibuka dalam mode standalone (sudah terinstal), sembunyikan banner
         if (window.matchMedia('(display-mode: standalone)').matches) {
             installBanner.style.display = 'none';
         }
