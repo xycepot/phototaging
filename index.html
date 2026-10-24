@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>XYCHEPOTO · phototaging</title>
+
+    <!-- ============ PWA META ============ -->
+    <meta name="theme-color" content="#151e26">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="XYCHEPOTO">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="application-name" content="XYCHEPOTO">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='110' fill='%23151e26'/><circle cx='256' cy='256' r='150' fill='none' stroke='%237aa9d9' stroke-width='24'/><circle cx='256' cy='256' r='60' fill='%23c0e0ff'/><rect x='96' y='176' width='80' height='56' rx='14' fill='%237aa9d9'/><text x='256' y='430' text-anchor='middle' font-family='system-ui,sans-serif' font-size='64' font-weight='800' fill='%23c0e0ff' letter-spacing='4'>XY</text></svg>">
+    <link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='110' fill='%23151e26'/><circle cx='256' cy='256' r='150' fill='none' stroke='%237aa9d9' stroke-width='24'/><circle cx='256' cy='256' r='60' fill='%23c0e0ff'/><rect x='96' y='176' width='80' height='56' rx='14' fill='%237aa9d9'/><text x='256' y='430' text-anchor='middle' font-family='system-ui,sans-serif' font-size='64' font-weight='800' fill='%23c0e0ff' letter-spacing='4'>XY</text></svg>">
+
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; font-family: system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; }
+        body { background:#0b0f14; min-height:100vh; display:flex; justify-content:center; align-items:center; padding:10px; }
+        .app-container {
+            max-width:480px; width:100%; background:#151e26; border-radius:36px;
+            padding:24px 18px 30px; box-shadow:0 25px 40px -10px rgba(0,0,0,.6), inset 0 1px 2px rgba(255,255,255,.05);
+            border:1px solid #2a3a46;
+        }
+        h1 {
+            font-size:2rem; font-weight:700; letter-spacing:2px; text-align:center;
+            background:linear-gradient(135deg,#c0e0ff,#7aa9d9); -webkit-background-clip:text;
+            -webkit-text-fill-color:transparent; background-clip:text; margin-bottom:6px;
+        }
+        .subhead { text-align:center; color:#7f98aa; font-size:.75rem; text-transform:uppercase; letter-spacing:3px; margin-bottom:20px; }
+        .camera-wrap {
+            position:relative; border-radius:32px; overflow:hidden; background:#10171e;
+            aspect-ratio:1/1; margin-bottom:20px; box-shadow:0 0 0 2px #1f2e38, 0 15px 25px -8px black;
+        }
+        #video { width:100%; height:100%; object-fit:cover; display:block; transform:scaleX(-1); }
+        .camera-placeholder {
+            position:absolute; inset:0; display:flex; flex-direction:column; justify-content:center;
+            align-items:center; color:#3f5563; font-size:.9rem; gap:8px; pointer-events:none;
+            background:#10171e; z-index:2;
+        }
+        .camera-placeholder span { font-size:2.5rem; filter:drop-shadow(0 4px 6px black); }
+        .camera-wrap.active .camera-placeholder { display:none; }
+        .action-bar { display:flex; gap:12px; margin-bottom:22px; }
+        .btn {
+            border:none; border-radius:60px; padding:16px 8px; font-weight:600; font-size:.95rem;
+            display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer;
+            flex:1; background:#1e2c35; color:#cbdae6;
+            box-shadow:0 6px 0 #0e151b, 0 6px 12px rgba(0,0,0,.6);
+            border:1px solid #2e4050; transition:transform .15s;
+        }
+        .btn:active { transform:translateY(4px); box-shadow:0 2px 0 #0e151b; }
+        .btn-primary { background:#1c4e6e; color:#fff; box-shadow:0 6px 0 #0c2c40; border-color:#2e6d94; }
+        .btn-primary:active { box-shadow:0 2px 0 #0c2c40; }
+        .btn-share { background:#1e5e3c; color:#fff; box-shadow:0 6px 0 #0e3a24; border-color:#2e7a52; }
+        .btn-share:active { box-shadow:0 2px 0 #0e3a24; }
+        .btn:disabled { opacity:.4; pointer-events:none; transform:none !important; }
+        .tag-card {
+            background:#0d171f; border-radius:26px; padding:16px; border:1px solid #20313d;
+            box-shadow:inset 0 1px 0 rgba(255,255,255,.03), 0 12px 18px -8px black; margin-bottom:16px;
+        }
+        .tag-row {
+            display:flex; align-items:flex-start; gap:10px; padding:8px 0;
+            border-bottom:1px solid #1a2a33; color:#b4cbd9; font-size:.85rem; line-height:1.4;
+        }
+        .tag-row:last-child { border-bottom:none; }
+        .tag-icon { font-size:1.15rem; min-width:26px; text-align:center; }
+        .tag-text { flex:1; word-break:break-word; }
+        .tag-text strong { color:#e3f0fa; font-weight:600; }
+        .tag-sub { color:#6b8b9c; font-size:.7rem; letter-spacing:.2px; display:block; margin-top:2px; }
+        #waktuDisplay { font-variant-numeric: tabular-nums; font-weight:500; color:#c8e2f5; }
+        .preview-box {
+            border-radius:20px; overflow:hidden; background:#0a1218; border:1px solid #2b4150; margin-bottom:12px;
+        }
+        #photoPreview { width:100%; display:none; aspect-ratio:1/1; object-fit:contain; background:#0e1a22; }
+        .empty-preview {
+            display:flex; align-items:center; justify-content:center; aspect-ratio:1/1;
+            background:#0e1a22; color:#3f5b6b; font-size:.85rem; flex-direction:column; gap:6px;
+        }
+        .empty-preview span { font-size:2.2rem; opacity:.5; }
+        .status-line {
+            text-align:center; color:#6b8b9c; font-size:.72rem; margin:6px 0 12px;
+            min-height:16px; font-style:italic;
+        }
+        .footer-note { text-align:center; color:#314753; font-size:.6rem; margin-top:10px; letter-spacing:1px; }
+
+        /* ============ PWA INSTALL BANNER ============ */
+        .install-banner {
+            position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%) translateY(200%);
+            background: linear-gradient(135deg,#1c4e6e,#1e5e3c); color:#fff;
+            padding: 12px 16px; border-radius: 18px; box-shadow: 0 15px 30px -8px black;
+            display: flex; align-items: center; gap: 12px; max-width: 440px; width: calc(100% - 24px);
+            transition: transform .35s cubic-bezier(.2,.9,.3,1.2); z-index: 999; border:1px solid #2e6d94;
+        }
+        .install-banner.show { transform: translateX(-50%) translateY(0); }
+        .install-banner .ib-icon { font-size: 1.8rem; filter: drop-shadow(0 2px 4px black); }
+        .install-banner .ib-text { flex:1; font-size: .85rem; line-height:1.3; }
+        .install-banner .ib-text b { display:block; font-size:.95rem; margin-bottom:2px; }
+        .install-banner .ib-btn {
+            background:#c0e0ff; color:#0b1a24; border:none; padding:10px 14px; border-radius:12px;
+            font-weight:700; font-size:.82rem; cursor:pointer; white-space:nowrap;
+        }
+        .install-banner .ib-close {
+            background:transparent; border:none; color:#c0e0ff; font-size:1.2rem; cursor:pointer; padding:4px;
+        }
+    </style>
+
+    <!-- ============ MANIFEST (inline via Blob) ============ -->
+    <script>
+        // Manifest disuntikkan saat runtime via Blob URL — membuat PWA bisa diinstal tanpa file .webmanifest terpisah.
+        (function generateManifest() {
+            const iconSvg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'>
+                <rect width='512' height='512' rx='110' fill='#151e26'/>
+                <circle cx='256' cy='256' r='150' fill='none' stroke='#7aa9d9' stroke-width='24'/>
+                <circle cx='256' cy='256' r='60' fill='#c0e0ff'/>
+                <rect x='96' y='176' width='80' height='56' rx='14' fill='#7aa9d9'/>
+                <text x='256' y='430' text-anchor='middle' font-family='system-ui,sans-serif' font-size='64' font-weight='800' fill='#c0e0ff' letter-spacing='4'>XY</text>
+            </svg>`;
+
+            // Data URI SVG → base64 untuk manifest icons
+            const svgDataUri = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(iconSvg)));
+
+            const manifest = {
+                name: "XYCHEPOTO · Phototaging",
+                short_name: "XYCHEPOTO",
+                description: "Aplikasi phototaging — ambil foto & tempel info lokasi otomatis.",
+                start_url: ".",
+                scope: ".",
+                display: "standalone",
+                orientation: "portrait",
+                background_color: "#0b0f14",
+                theme_color: "#151e26",
+                lang: "id",
+                icons: [
+                    { src: svgDataUri, sizes: "any", type: "image/svg+xml", purpose: "any" },
+                    { src: svgDataUri, sizes: "192x192", type: "image/svg+xml", purpose: "any" },
+                    { src: svgDataUri, sizes: "512x512", type: "image/svg+xml", purpose: "any" },
+                    { src: svgDataUri, sizes: "any", type: "image/svg+xml", purpose: "maskable" }
+                ]
+            };
+
+            const blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('link');
+            link.rel = 'manifest';
+            link.href = url;
+            document.head.appendChild(link);
+        })();
+    </script>
+</head>
+<body>
+    <div class="app-container">
+        <h1>XYCHEPOTO</h1>
+        <div class="subhead">phototaging</div>
+
+        <div class="camera-wrap" id="cameraWrap">
+            <video id="video" autoplay playsinline muted></video>
+            <div class="camera-placeholder" id="cameraPlaceholder">
+                <span>📸</span>
+                <div>Kamera belum aktif</div>
+            </div>
+        </div>
+
+        <div class="action-bar">
+            <button class="btn btn-primary" id="startCameraBtn">🎥 Nyalakan</button>
+            <button class="btn btn-primary" id="takePhotoBtn" disabled>📷 Take Photo</button>
+        </div>
+
+        <div class="tag-card">
+            <div class="tag-row">
+                <div class="tag-icon">📍</div>
+                <div class="tag-text">
+                    <strong id="locName">Mengambil lokasi…</strong>
+                    <span class="tag-sub" id="locSub">menunggu GPS</span>
+                </div>
+            </div>
+            <div class="tag-row">
+                <div class="tag-icon">🏠</div>
+                <div class="tag-text">
+                    <strong>Alamat:</strong> <span id="addressTxt">—</span>
+                </div>
+            </div>
+            <div class="tag-row">
+                <div class="tag-icon">🌐</div>
+                <div class="tag-text">
+                    <strong>GPS (DD):</strong> <span id="gpsTxt">—</span>
+                </div>
+            </div>
+            <div class="tag-row">
+                <div class="tag-icon">📅</div>
+                <div class="tag-text">
+                    <strong>Waktu:</strong> <span id="waktuDisplay">—</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="status-line" id="statusLine"></div>
+
+        <div class="preview-box">
+            <div class="empty-preview" id="emptyPreview">
+                <span>🖼️</span>
+                <div>Belum ada foto</div>
+            </div>
+            <img id="photoPreview" alt="Hasil foto">
+        </div>
+
+        <button class="btn btn-share" id="shareWhatsappBtn" disabled style="width:100%">💬 Share ke WhatsApp</button>
+        <div class="footer-note">XYCHEPOTO · tagging otomatis</div>
+    </div>
+
+    <!-- ============ PWA INSTALL BANNER ============ -->
+    <div class="install-banner" id="installBanner">
+        <div class="ib-icon">📷</div>
+        <div class="ib-text">
+            <b>Pasang XYCHEPOTO</b>
+            Akses cepat dari layar utama
+        </div>
+        <button class="ib-btn" id="installBtn">Pasang</button>
+        <button class="ib-close" id="installClose" title="Tutup">✕</button>
+    </div>
+
+    <script>
+    (function () {
+        // ---------- DOM ----------
+        const video = document.getElementById('video');
+        const cameraWrap = document.getElementById('cameraWrap');
+        const cameraPlaceholder = document.getElementById('cameraPlaceholder');
+        const startCameraBtn = document.getElementById('startCameraBtn');
+        const takePhotoBtn = document.getElementById('takePhotoBtn');
+        const shareWhatsappBtn = document.getElementById('shareWhatsappBtn');
+        const photoPreview = document.getElementById('photoPreview');
+        const emptyPreview = document.getElementById('emptyPreview');
+        const waktuDisplay = document.getElementById('waktuDisplay');
+        const locName = document.getElementById('locName');
+        const locSub = document.getElementById('locSub');
+        const addressTxt = document.getElementById('addressTxt');
+        const gpsTxt = document.getElementById('gpsTxt');
+        const statusLine = document.getElementById('statusLine');
+
+        // PWA DOM
+        const installBanner = document.getElementById('installBanner');
+        const installBtn = document.getElementById('installBtn');
+        const installClose = document.getElementById('installClose');
+
+        // ---------- STATE ----------
+        let stream = null;
+        let lastPhotoDataUrl = null;
+
+        const geo = {
+            lat: null, lon: null,
+            latDD: '—', lonDD: '—',
+            locationName: 'Lokasi tidak diketahui',
+            addressText: '',
+            ready: false
+        };
+
+        // ---------- WAKTU ----------
+        function nowParts() {
+            const n = new Date();
+            const p = (x) => String(x).padStart(2, '0');
+            const dateLocal = `${n.getFullYear()}-${p(n.getMonth()+1)}-${p(n.getDate())}`;
+            const timeLocal = `${p(n.getHours())}:${p(n.getMinutes())}:${p(n.getSeconds())}`;
+            return { dateLocal, timeLocal, combined: `${dateLocal} | ${timeLocal}` };
+        }
+        function tickClock() {
+            const t = nowParts();
+            waktuDisplay.textContent = `${t.dateLocal} | ${t.timeLocal}`;
+        }
+        tickClock();
+        setInterval(tickClock, 1000);
+
+        // ---------- Reverse Geocode ----------
+        function buildAddressText(a) {
+            const kelurahan = a.village || a.suburb || a.neighbourhood || a.hamlet || '';
+            const kecamatan = a.city_district || a.district || a.municipality || a.county || '';
+            const kabupaten = a.city || a.town || a.regency || (a.county && a.county !== kecamatan ? a.county : '');
+            const provinsi = a.state || a.province || '';
+            const kodepos = a.postcode || '';
+            const part2 = [kecamatan, kabupaten].filter(Boolean).join(' ').trim();
+            const parts = [];
+            if (kelurahan) parts.push(kelurahan);
+            if (part2) parts.push(part2);
+            if (provinsi) parts.push(provinsi);
+            if (kodepos) parts.push(kodepos);
+            if (!parts.length) return a.display_name || '';
+            return parts.join(', ');
+        }
+
+        async function fetchLocation() {
+            if (!navigator.geolocation) {
+                locName.textContent = 'Lokasi tidak didukung';
+                locSub.textContent = 'Geolocation tidak tersedia';
+                statusLine.textContent = 'GPS tidak didukung';
+                return;
+            }
+            statusLine.textContent = 'Mengambil lokasi GPS…';
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+                const { latitude, longitude } = pos.coords;
+                geo.lat = latitude; geo.lon = longitude;
+                geo.latDD = latitude.toFixed(6);
+                geo.lonDD = longitude.toFixed(6);
+                gpsTxt.textContent = `Lat ${geo.latDD}, Long ${geo.lonDD}`;
+                locName.textContent = 'Mencari nama lokasi…';
+                locSub.textContent = `${geo.latDD}, ${geo.lonDD}`;
+                try {
+                    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1&accept-language=id,en`;
+                    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+                    if (!res.ok) throw new Error('Reverse geocode gagal');
+                    const data = await res.json();
+                    const a = data.address || {};
+                    geo.locationName = data.name || a.tourism || a.amenity || a.building || a.leisure ||
+                        a.village || a.suburb || a.town || a.city || 'Lokasi';
+                    geo.addressText = buildAddressText(a);
+                    locName.textContent = geo.locationName;
+                    locSub.textContent = `${geo.latDD}, ${geo.lonDD}`;
+                    addressTxt.textContent = geo.addressText || 'Alamat tidak tersedia';
+                    geo.ready = true;
+                    statusLine.textContent = 'Lokasi siap ✓';
+                } catch (err) {
+                    console.warn('Reverse geocode error:', err);
+                    geo.locationName = `Lat ${geo.latDD}`;
+                    geo.addressText = `Koordinat ${geo.latDD}, ${geo.lonDD}`;
+                    locName.textContent = geo.locationName;
+                    locSub.textContent = 'Nama lokasi tidak tersedia';
+                    addressTxt.textContent = geo.addressText;
+                    geo.ready = true;
+                    statusLine.textContent = 'Lokasi didapat (nama tidak tersedia)';
+                }
+            }, (err) => {
+                console.warn('Geolocation error:', err);
+                statusLine.textContent = 'Gagal ambil GPS — cek izin lokasi';
+                locName.textContent = 'Lokasi tidak tersedia';
+                locSub.textContent = 'Izin GPS ditolak / tidak tersedia';
+                addressTxt.textContent = '—';
+                gpsTxt.textContent = '—';
+            }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+        }
+
+        // ---------- KAMERA ----------
+        async function startCamera() {
+            if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 1280 } },
+                    audio: false
+                });
+                video.srcObject = stream;
+                await video.play();
+                cameraWrap.classList.add('active');
+                cameraPlaceholder.style.display = 'none';
+                takePhotoBtn.disabled = false;
+                startCameraBtn.textContent = '🔄 Nyalakan Ulang';
+            } catch (err) {
+                console.error(err);
+                alert('Tidak dapat mengakses kamera. Pastikan izin dan pakai HTTPS.');
+                takePhotoBtn.disabled = true;
+            }
+        }
+
+        // ---------- BURN TAG ----------
+        function drawTagOnCanvas(ctx, canvasW, canvasH, photoH) {
+            const pad = Math.round(canvasW * 0.04);
+            const fontSize = Math.round(canvasW * 0.030);
+            const lineHeight = Math.round(fontSize * 1.45);
+            const t = nowParts();
+            const lines = [
+                `📍 ${geo.locationName}`,
+                `🏠 Alamat: ${geo.addressText || '—'}`,
+                `🌐 GPS: Lat ${geo.latDD}, Long ${geo.lonDD}`,
+                `📅 Waktu: ${t.dateLocal} | ${t.timeLocal}`
+            ];
+            const wrapped = [];
+            ctx.font = `${fontSize}px system-ui, -apple-system, sans-serif`;
+            const maxWidth = canvasW - pad * 2;
+            lines.forEach(line => {
+                const words = line.split(' ');
+                let cur = '';
+                words.forEach(w => {
+                    const test = cur ? cur + ' ' + w : w;
+                    if (ctx.measureText(test).width > maxWidth && cur) { wrapped.push(cur); cur = w; }
+                    else { cur = test; }
+                });
+                if (cur) wrapped.push(cur);
+            });
+            const boxY = photoH;
+            const grad = ctx.createLinearGradient(0, boxY, 0, canvasH);
+            grad.addColorStop(0, '#0d171f');
+            grad.addColorStop(1, '#050a0e');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, boxY, canvasW, canvasH - boxY);
+            ctx.fillStyle = '#ffffff';
+            ctx.textBaseline = 'top';
+            ctx.shadowColor = 'rgba(0,0,0,0.9)';
+            ctx.shadowBlur = 3;
+            ctx.shadowOffsetX = 1;
+            ctx.shadowOffsetY = 1;
+            let y = boxY + pad;
+            wrapped.forEach(line => { ctx.fillText(line, pad, y); y += lineHeight; });
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+        }
+
+        // ---------- TAKE PHOTO ----------
+        function takePhoto() {
+            if (!stream || !video.videoWidth) { alert('Kamera belum siap.'); return; }
+            const w = video.videoWidth, h = video.videoHeight;
+            const fontSize = Math.round(w * 0.030);
+            const lineHeight = Math.round(fontSize * 1.45);
+            const pad = Math.round(w * 0.04);
+            const estimatedLines = 8;
+            const tagArea = pad * 2 + estimatedLines * lineHeight;
+            const canvasW = w, canvasH = h + tagArea;
+            const canvas = document.createElement('canvas');
+            canvas.width = canvasW; canvas.height = canvasH;
+            const ctx = canvas.getContext('2d');
+            ctx.save();
+            ctx.translate(w, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(video, 0, 0, w, h);
+            ctx.restore();
+            ctx.fillStyle = '#050a0e';
+            ctx.fillRect(0, h, canvasW, canvasH - h);
+            drawTagOnCanvas(ctx, canvasW, canvasH, h);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+            lastPhotoDataUrl = dataUrl;
+            photoPreview.src = dataUrl;
+            photoPreview.style.display = 'block';
+            emptyPreview.style.display = 'none';
+            shareWhatsappBtn.disabled = false;
+            statusLine.textContent = 'Foto siap dibagikan ✓';
+        }
+
+        // ---------- SHARE ----------
+        function buildCaption() {
+            const t = nowParts();
+            return (
+                `📍 ${geo.locationName}\n` +
+                `🏠 Alamat: ${geo.addressText || '—'}\n` +
+                `🌐 GPS: Lat ${geo.latDD}, Long ${geo.lonDD}\n` +
+                `📅 Waktu: ${t.dateLocal} | ${t.timeLocal}\n\n` +
+                `#XYCHEPOTO`
+            );
+        }
+        function shareToWhatsapp() {
+            if (!lastPhotoDataUrl) { alert('Belum ada foto.'); return; }
+            const caption = buildCaption();
+            if (navigator.share && navigator.canShare) {
+                fetch(lastPhotoDataUrl).then(r => r.blob()).then(blob => {
+                    const file = new File([blob], 'xychepoto.jpg', { type: 'image/jpeg' });
+                    const shareData = { files: [file], text: caption, title: 'XYCHEPOTO' };
+                    if (navigator.canShare(shareData)) return navigator.share(shareData);
+                    throw new Error('File share tidak didukung');
+                }).then(() => console.log('Shared'))
+                  .catch(err => { console.warn(err); fallbackShare(caption); });
+            } else { fallbackShare(caption); }
+        }
+        function fallbackShare(caption) {
+            const url = `https://wa.me/?text=${encodeURIComponent(caption)}`;
+            window.open(url, '_blank');
+            alert('Foto tidak dapat dilampirkan otomatis. Silakan lampirkan foto dari galeri setelah WhatsApp terbuka.');
+        }
+
+        // ---------- EVENT ----------
+        startCameraBtn.addEventListener('click', startCamera);
+        takePhotoBtn.addEventListener('click', takePhoto);
+        shareWhatsappBtn.addEventListener('click', shareToWhatsapp);
+        window.addEventListener('beforeunload', () => { if (stream) stream.getTracks().forEach(t => t.stop()); });
+
+        // ---------- PWA: Service Worker (inline Blob) ----------
+        // SW diperlukan agar PWA memenuhi syarat "installable" di Chrome/Android.
+        // Kita daftarkan SW minimal yang meng-cache app shell (offline-first).
+        async function registerSW() {
+            if (!('serviceWorker' in navigator)) return;
+            try {
+                const swCode = `
+                    const CACHE = 'xychepoto-v1';
+                    self.addEventListener('install', e => {
+                        self.skipWaiting();
+                    });
+                    self.addEventListener('activate', e => {
+                        e.waitUntil(clients.claim());
+                    });
+                    self.addEventListener('fetch', e => {
+                        // Network-first untuk HTML & API; fallback cache untuk asset.
+                        if (e.request.method !== 'GET') return;
+                        e.respondWith(
+                            fetch(e.request).then(res => {
+                                const copy = res.clone();
+                                caches.open(CACHE).then(c => c.put(e.request, copy)).catch(()=>{});
+                                return res;
+                            }).catch(() => caches.match(e.request).then(r => r || new Response('Offline', {status:503})))
+                        );
+                    });
+                `;
+                const blob = new Blob([swCode], { type: 'text/javascript' });
+                const swUrl = URL.createObjectURL(blob);
+                await navigator.serviceWorker.register(swUrl);
+                console.log('[PWA] Service Worker terdaftar (inline Blob).');
+            } catch (err) {
+                console.warn('[PWA] Gagal registrasi SW:', err);
+            }
+        }
+        registerSW();
+
+        // ---------- PWA: Install Prompt ----------
+        let deferredPrompt = null;
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            // Tampilkan banner jika belum diinstal
+            if (!window.matchMedia('(display-mode: standalone)').matches) {
+                installBanner.classList.add('show');
+            }
+        });
+
+        installBtn.addEventListener('click', async () => {
+            if (!deferredPrompt) return;
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            console.log('[PWA] Pilihan instalasi:', outcome);
+            deferredPrompt = null;
+            installBanner.classList.remove('show');
+        });
+
+        installClose.addEventListener('click', () => {
+            installBanner.classList.remove('show');
+        });
+
+        window.addEventListener('appinstalled', () => {
+            console.log('[PWA] XYCHEPOTO berhasil diinstal.');
+            installBanner.classList.remove('show');
+            deferredPrompt = null;
+        });
+
+        // Jika dibuka dalam mode standalone (sudah terinstal), sembunyikan banner
+        if (window.matchMedia('(display-mode: standalone)').matches) {
+            installBanner.style.display = 'none';
+        }
+
+        // ---------- INIT ----------
+        takePhotoBtn.disabled = true;
+        shareWhatsappBtn.disabled = true;
+        fetchLocation();
+    })();
+    </script>
+</body>
+</html>
