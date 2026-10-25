@@ -34,10 +34,10 @@
             aspect-ratio:1/1; margin-bottom:20px; box-shadow:0 0 0 2px #1f2e38, 0 15px 25px -8px black;
         }
         #video { width:100%; height:100%; object-fit:cover; display:block; }
-        /* Kamera belakang: mirror agar terasa natural saat preview */
-        #video.back { transform: scaleX(-1); }
-        /* Kamera depan: tidak mirror (sesuai preview selfie umum) */
-        #video.front { transform: none; }
+        /* Kamera belakang: TIDAK mirror (apa adanya) */
+        #video.back { transform: none; }
+        /* Kamera depan: mirror (seperti cermin, natural untuk selfie) */
+        #video.front { transform: scaleX(-1); }
 
         .camera-placeholder {
             position:absolute; inset:0; display:flex; flex-direction:column; justify-content:center;
@@ -543,19 +543,17 @@
         }
 
         // ---------- TAKE PHOTO ----------
-        function takePhoto() {
+            function takePhoto() {
             if (!stream || !video.videoWidth) { alert('Kamera belum siap.'); return; }
             const w = video.videoWidth;
             const h = video.videoHeight;
-
             const canvas = document.createElement('canvas');
-            canvas.width = w;
-            canvas.height = h;
+            canvas.width = w; canvas.height = h;
             const ctx = canvas.getContext('2d');
 
-            // Mirror hanya untuk kamera belakang (agar hasil akhir sesuai preview)
-            // Kamera depan: tidak mirror (selfie natural)
-            if (currentFacing === 'environment') {
+            // Kamera DEPAN: mirror agar hasil = preview (cermin natural)
+            // Kamera BELAKANG: tidak mirror (apa adanya)
+            if (currentFacing === 'user') {
                 ctx.save();
                 ctx.translate(w, 0);
                 ctx.scale(-1, 1);
@@ -569,12 +567,11 @@
 
             const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
             lastPhotoDataUrl = dataUrl;
-
             photoPreview.src = dataUrl;
             photoPreview.style.display = 'block';
             emptyPreview.style.display = 'none';
             shareWhatsappBtn.disabled = false;
-            statusLine.textContent = `Foto siap dibagikan ✓ (kamera ${currentFacing === 'user' ? 'depan' : 'belakang'})`;
+            setStatus(`Foto siap dibagikan ✓ (kamera ${currentFacing === 'user' ? 'depan' : 'belakang'})`);
         }
 
         // ---------- SHARE ----------
